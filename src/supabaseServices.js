@@ -1,10 +1,13 @@
 // ============================================
-// SERVICIOS SUPABASE - YLIO v2.2
+// SERVICIOS SUPABASE - YLIO v2.3
+// Con debug detallado para diagnosticar problemas
 // ============================================
 
-// Configuración Supabase - USA TUS CREDENCIALES
+// CONFIGURACIÓN - TUS CREDENCIALES
 const SUPABASE_URL = 'https://edhyacacepvfvjuwfzrp.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkaHlhY2FjZXB2ZnZqdXdmenJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzU4MTUsImV4cCI6MjA4Mzk1MTgxNX0.9M1Cs9OZi5FIzSKuzw5nT3H2Dq8PCoG1g2Xy6rlhQm0';
+
+console.log('🔧 Supabase Config:', { url: SUPABASE_URL, keyLength: SUPABASE_KEY.length });
 
 const headers = {
   'apikey': SUPABASE_KEY,
@@ -14,68 +17,101 @@ const headers = {
 };
 
 // ============================================
-// FUNCIÓN AUXILIAR PARA PETICIONES
+// FUNCIÓN BASE PARA PETICIONES
 // ============================================
-const fetchSupabase = async (endpoint, options = {}) => {
+const supabaseFetch = async (endpoint, options = {}) => {
   const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
-  console.log(`📡 Supabase: ${options.method || 'GET'} ${endpoint}`);
+  const method = options.method || 'GET';
+  
+  console.log(`📡 [${method}] ${endpoint}`);
   
   try {
-    const res = await fetch(url, {
-      ...options,
-      headers: { ...headers, ...options.headers }
-    });
+    const fetchOptions = {
+      method,
+      headers: { ...headers, ...options.headers },
+    };
     
-    const text = await res.text();
-    let data;
-    
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch {
-      data = text;
+    if (options.body) {
+      fetchOptions.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
     }
     
-    if (!res.ok) {
-      console.error('❌ Error Supabase:', res.status, data);
-      throw new Error(typeof data === 'object' ? JSON.stringify(data) : data);
+    const response = await fetch(url, fetchOptions);
+    const responseText = await response.text();
+    
+    console.log(`📥 Status: ${response.status}`);
+    
+    let data = null;
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        data = responseText;
+      }
     }
     
-    console.log('✅ OK');
+    if (!response.ok) {
+      console.error('❌ Error:', response.status, data);
+      return { 
+        success: false, 
+        error: typeof data === 'object' ? (data.message || data.error || JSON.stringify(data)) : data,
+        status: response.status 
+      };
+    }
+    
+    console.log('✅ OK - Datos:', Array.isArray(data) ? `${data.length} registros` : 'objeto');
     return { success: true, data };
+    
   } catch (error) {
-    console.error('❌ Error:', error.message);
-    return { success: false, error: error.message };
+    console.error('❌ Error de red:', error.message);
+    return { success: false, error: error.message, networkError: true };
   }
 };
+
+// ============================================
+// TEST DE CONEXIÓN (ejecutar al cargar)
+// ============================================
+export const testConexion = async () => {
+  console.log('🔄 Probando conexión a Supabase...');
+  const result = await supabaseFetch('ofertas?select=oferta_id&limit=1');
+  
+  if (result.success) {
+    console.log('✅ CONEXIÓN OK');
+    return { success: true, message: 'Conexión establecida' };
+  } else {
+    console.error('❌ CONEXIÓN FALLIDA:', result.error);
+    return result;
+  }
+};
+
+// Ejecutar test al importar el módulo
+testConexion();
 
 // ============================================
 // OFERTAS
 // ============================================
 
 export const obtenerSiguienteOfertaId = async () => {
-  try {
-    const result = await fetchSupabase('ofertas?select=oferta_id&order=oferta_id.desc&limit=1');
-    
-    let siguienteNum = 1;
-    if (result.success && result.data && result.data.length > 0) {
-      const ultimoId = result.data[0].oferta_id;
-      // Extraer número del ID (formato: 10xxx o OFE_2026_xxx)
-      const match = ultimoId.match(/(\d+)$/);
-      if (match) {
-        siguienteNum = parseInt(match[1]) + 1;
-      }
+  console.log('🔢 Obteniendo siguiente ID...');
+  const result = await supabaseFetch('ofertas?select=oferta_id&order=oferta_id.desc&limit=1');
+  
+  let nuevoId = '10001';
+  
+  if (result.success && result.data && result.data.length > 0) {
+    const ultimoId = result.data[0].oferta_id;
+    console.log('📌 Último ID encontrado:', ultimoId);
+    const match = ultimoId.match(/(\d+)$/);
+    if (match) {
+      nuevoId = '10' + String(parseInt(match[1]) + 1).padStart(3, '0');
     }
-    
-    const nuevoId = '10' + String(siguienteNum).padStart(3, '0');
-    console.log('✅ Siguiente ID:', nuevoId);
-    return { success: true, id: nuevoId };
-  } catch (error) {
-    console.error('❌ Error obteniendo ID:', error);
-    return { success: false, error: error.message, id: '10001' };
   }
+  
+  console.log('🆔 Nuevo ID:', nuevoId);
+  return { success: true, id: nuevoId };
 };
 
 export const guardarOferta = async (ofertaId, datos) => {
+  console.log('💾 Guardando oferta:', ofertaId);
+  
   const ofertaData = {
     oferta_id: ofertaId,
     oferta_denominacion: datos.denominacion_oferta || null,
@@ -83,12 +119,10 @@ export const guardarOferta = async (ofertaId, datos) => {
     oferta_descripcion_version: datos.descripcion_version || null,
     oferta_fecha_solicitud: datos.fecha_solicitud || null,
     oferta_fecha_inicio: datos.fecha_inicio || null,
-    
     cliente_denominacion: datos.cliente_denominacion || null,
     cliente_razon_social: datos.cliente_nombre || null,
     cliente_cif: datos.cliente_cif || null,
     cliente_cnae: datos.cnae || null,
-    
     proyecto_direccion: datos.ubicacion_direccion || null,
     proyecto_cp: datos.ubicacion_cp || null,
     proyecto_municipio: datos.ubicacion_municipio || null,
@@ -96,11 +130,9 @@ export const guardarOferta = async (ofertaId, datos) => {
     proyecto_comunidad: datos.ubicacion_comunidad || null,
     proyecto_latitud: datos.ubicacion_latitud ? parseFloat(datos.ubicacion_latitud) : null,
     proyecto_longitud: datos.ubicacion_longitud ? parseFloat(datos.ubicacion_longitud) : null,
-    
     archivo_sips: datos.archivo_sips || null,
     fuente_datos_consumo: datos.fuente_datos_consumo || null,
     archivo_consumo: datos.archivo_consumo || null,
-    
     sips_cups: datos.sips_cups || null,
     sips_distribuidora: datos.sips_distribuidora || null,
     sips_tarifa: datos.sips_tarifa || null,
@@ -115,29 +147,31 @@ export const guardarOferta = async (ofertaId, datos) => {
   };
 
   // Verificar si existe
-  const checkResult = await fetchSupabase(`ofertas?oferta_id=eq.${ofertaId}&select=id`);
+  const checkResult = await supabaseFetch(`ofertas?oferta_id=eq.${ofertaId}&select=id`);
   
   if (checkResult.success && checkResult.data && checkResult.data.length > 0) {
-    // UPDATE
-    return await fetchSupabase(`ofertas?oferta_id=eq.${ofertaId}`, {
+    console.log('📝 Actualizando oferta existente...');
+    return await supabaseFetch(`ofertas?oferta_id=eq.${ofertaId}`, {
       method: 'PATCH',
-      body: JSON.stringify(ofertaData)
+      body: ofertaData
     });
   } else {
-    // INSERT
-    return await fetchSupabase('ofertas', {
+    console.log('➕ Creando nueva oferta...');
+    return await supabaseFetch('ofertas', {
       method: 'POST',
-      body: JSON.stringify(ofertaData)
+      body: ofertaData
     });
   }
 };
 
 export const cargarOferta = async (ofertaId) => {
-  const result = await fetchSupabase(`ofertas?oferta_id=eq.${ofertaId}`);
+  console.log('📂 Cargando oferta:', ofertaId);
+  const result = await supabaseFetch(`ofertas?oferta_id=eq.${ofertaId}`);
+  
   if (result.success && result.data && result.data[0]) {
     return { success: true, data: result.data[0] };
   }
-  return { success: false, error: 'No encontrada' };
+  return { success: false, error: 'Oferta no encontrada' };
 };
 
 // ============================================
@@ -145,6 +179,8 @@ export const cargarOferta = async (ofertaId) => {
 // ============================================
 
 export const guardarDatosSIPS = async (ofertaId, datosSIPS) => {
+  console.log('💾 Guardando SIPS para:', ofertaId);
+  
   const sipsData = {
     oferta_id: ofertaId,
     cups: datosSIPS.sips_cups || null,
@@ -168,13 +204,13 @@ export const guardarDatosSIPS = async (ofertaId, datosSIPS) => {
     datos_raw: datosSIPS
   };
 
-  // Eliminar existente
-  await fetchSupabase(`ofertas_sips?oferta_id=eq.${ofertaId}`, { method: 'DELETE' });
+  // Eliminar existente primero
+  await supabaseFetch(`ofertas_sips?oferta_id=eq.${ofertaId}`, { method: 'DELETE' });
   
   // Insertar nuevo
-  return await fetchSupabase('ofertas_sips', {
+  return await supabaseFetch('ofertas_sips', {
     method: 'POST',
-    body: JSON.stringify(sipsData)
+    body: sipsData
   });
 };
 
@@ -183,11 +219,13 @@ export const guardarDatosSIPS = async (ofertaId, datosSIPS) => {
 // ============================================
 
 export const guardarConsumosBrutos = async (ofertaId, consumosBrutos) => {
+  console.log('💾 Guardando consumos brutos:', consumosBrutos.length, 'registros');
+  
   const batchSize = 500;
   let totalInsertados = 0;
 
   // Eliminar existentes
-  await fetchSupabase(`ofertas_consumos_brutos?oferta_id=eq.${ofertaId}`, { method: 'DELETE' });
+  await supabaseFetch(`ofertas_consumos_brutos?oferta_id=eq.${ofertaId}`, { method: 'DELETE' });
 
   // Insertar en batches
   for (let i = 0; i < consumosBrutos.length; i += batchSize) {
@@ -200,25 +238,26 @@ export const guardarConsumosBrutos = async (ofertaId, consumosBrutos) => {
       linea_original: c.lineaOriginal || null
     }));
 
-    const result = await fetchSupabase('ofertas_consumos_brutos', {
+    const result = await supabaseFetch('ofertas_consumos_brutos', {
       method: 'POST',
-      body: JSON.stringify(batch)
+      body: batch
     });
 
     if (!result.success) {
+      console.error('❌ Error en batch', i);
       return { success: false, error: result.error, count: totalInsertados };
     }
+    
     totalInsertados += batch.length;
-    console.log(`📊 Insertados ${totalInsertados}/${consumosBrutos.length} consumos brutos`);
+    console.log(`📊 Progreso: ${totalInsertados}/${consumosBrutos.length}`);
   }
 
   return { success: true, count: totalInsertados };
 };
 
 export const cargarConsumosBrutos = async (ofertaId) => {
-  const result = await fetchSupabase(
-    `ofertas_consumos_brutos?oferta_id=eq.${ofertaId}&order=fecha,hora`
-  );
+  console.log('📂 Cargando consumos brutos de:', ofertaId);
+  const result = await supabaseFetch(`ofertas_consumos_brutos?oferta_id=eq.${ofertaId}&order=fecha,hora`);
   
   if (result.success) {
     const consumos = (result.data || []).map(c => ({
@@ -228,6 +267,7 @@ export const cargarConsumosBrutos = async (ofertaId) => {
       añoOriginal: c.ano_original,
       lineaOriginal: c.linea_original
     }));
+    console.log('📊 Cargados:', consumos.length, 'registros');
     return { success: true, data: consumos };
   }
   return result;
@@ -238,11 +278,13 @@ export const cargarConsumosBrutos = async (ofertaId) => {
 // ============================================
 
 export const guardarConsumosProcesados = async (ofertaId, consumosProcesados) => {
+  console.log('💾 Guardando consumos procesados:', consumosProcesados.length, 'registros');
+  
   const batchSize = 500;
   let totalInsertados = 0;
 
   // Eliminar existentes
-  await fetchSupabase(`ofertas_consumos_horarios?oferta_id=eq.${ofertaId}`, { method: 'DELETE' });
+  await supabaseFetch(`ofertas_consumos_horarios?oferta_id=eq.${ofertaId}`, { method: 'DELETE' });
 
   // Insertar en batches
   for (let i = 0; i < consumosProcesados.length; i += batchSize) {
@@ -253,16 +295,18 @@ export const guardarConsumosProcesados = async (ofertaId, consumosProcesados) =>
       consumo: c.consumo
     }));
 
-    const result = await fetchSupabase('ofertas_consumos_horarios', {
+    const result = await supabaseFetch('ofertas_consumos_horarios', {
       method: 'POST',
-      body: JSON.stringify(batch)
+      body: batch
     });
 
     if (!result.success) {
+      console.error('❌ Error en batch', i);
       return { success: false, error: result.error, count: totalInsertados };
     }
+    
     totalInsertados += batch.length;
-    console.log(`📊 Insertados ${totalInsertados}/${consumosProcesados.length} consumos procesados`);
+    console.log(`📊 Progreso: ${totalInsertados}/${consumosProcesados.length}`);
   }
 
   // Actualizar estadísticas
@@ -275,18 +319,17 @@ export const guardarConsumosProcesados = async (ofertaId, consumosProcesados) =>
     registros: consumosProcesados.length
   };
 
-  await fetchSupabase(`ofertas?oferta_id=eq.${ofertaId}`, {
+  await supabaseFetch(`ofertas?oferta_id=eq.${ofertaId}`, {
     method: 'PATCH',
-    body: JSON.stringify({ oferta_consumos: estadisticas })
+    body: { oferta_consumos: estadisticas }
   });
 
   return { success: true, count: totalInsertados };
 };
 
 export const cargarConsumosProcesados = async (ofertaId) => {
-  const result = await fetchSupabase(
-    `ofertas_consumos_horarios?oferta_id=eq.${ofertaId}&order=fecha,hora`
-  );
+  console.log('📂 Cargando consumos procesados de:', ofertaId);
+  const result = await supabaseFetch(`ofertas_consumos_horarios?oferta_id=eq.${ofertaId}&order=fecha,hora`);
   
   if (result.success) {
     const consumos = (result.data || []).map(c => ({
@@ -294,25 +337,8 @@ export const cargarConsumosProcesados = async (ofertaId) => {
       hora: c.hora,
       consumo: parseFloat(c.consumo)
     }));
+    console.log('📊 Cargados:', consumos.length, 'registros');
     return { success: true, data: consumos };
   }
   return result;
-};
-
-// ============================================
-// TEST DE CONEXIÓN
-// ============================================
-export const testConexion = async () => {
-  console.log('🔄 Probando conexión a Supabase...');
-  console.log('URL:', SUPABASE_URL);
-  
-  const result = await fetchSupabase('ofertas?select=oferta_id&limit=1');
-  
-  if (result.success) {
-    console.log('✅ Conexión exitosa!');
-    return { success: true, message: 'Conexión OK' };
-  } else {
-    console.error('❌ Error de conexión:', result.error);
-    return { success: false, error: result.error };
-  }
 };

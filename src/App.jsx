@@ -4048,15 +4048,17 @@ const Paso1Proyecto = ({ datos, onChange }) => {
   };
 
   const InputField = ({ label, campo, tipo = 'text', placeholder, width = '100%', opcional = false, desdeSIPS = false }) => (
-    <div style={{ marginBottom: '16px' }}>
+    <div style={{ marginBottom: '16px' }} key={`input-${campo}`}>
       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>
         {label}
         {opcional && <span style={{ color: COLOR_TEXT_LIGHT, fontWeight: '400' }}>(Opcional)</span>}
       </label>
-      <input type={tipo} value={datos[campo] || ''} onChange={(e) => handleChange(campo, e.target.value)} placeholder={placeholder}
+      <input 
+        type={tipo} 
+        value={datos[campo] || ''} 
+        onChange={(e) => handleChange(campo, e.target.value)} 
+        placeholder={placeholder}
         style={{ width, padding: '10px 14px', border: desdeSIPS && datos[campo] ? `2px solid #4CAF50` : '1px solid #DEE2E6', borderRadius: '8px', fontSize: '14px', backgroundColor: desdeSIPS && datos[campo] ? '#F1F8E9' : 'white', transition: 'all 0.2s', outline: 'none', boxSizing: 'border-box' }}
-        onFocus={(e) => e.target.style.borderColor = COLOR_CORP}
-        onBlur={(e) => e.target.style.borderColor = desdeSIPS && datos[campo] ? '#4CAF50' : '#DEE2E6'}
       />
     </div>
   );
