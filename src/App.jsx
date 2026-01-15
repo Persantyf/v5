@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   guardarDatosSIPS, 
   guardarConsumosBrutos, 
@@ -28,6 +28,120 @@ const COLOR_SUCCESS = "#28A745";
 const COLOR_WARNING = "#FFAC3E";  // Pantone 1365C
 const COLOR_DANGER = "#DC3545";
 const COLOR_INFO = "#17A2B8";
+// ============================================
+// COMPONENTES DE FORMULARIO GLOBALES
+// Definidos fuera de los componentes para evitar re-renders
+// ============================================
+
+const FormInput = React.memo(({ label, value, onChange, tipo = 'text', placeholder = '', width = '100%', opcional = false, desdeSIPS = false, unidad = '', disabled = false }) => (
+  <div style={{ marginBottom: '16px' }}>
+    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>
+      {label}
+      {opcional && <span style={{ color: COLOR_TEXT_LIGHT, fontWeight: '400' }}>(Opcional)</span>}
+      {desdeSIPS && value && <span style={{ marginLeft: '8px', fontSize: '10px', color: '#4CAF50', fontWeight: '400' }}>(SIPS)</span>}
+    </label>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <input
+        type={tipo}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        style={{
+          flex: 1,
+          width,
+          padding: '10px 14px',
+          border: desdeSIPS && value ? '2px solid #4CAF50' : '1px solid #DEE2E6',
+          borderRadius: '8px',
+          fontSize: '14px',
+          backgroundColor: disabled ? '#F5F5F5' : (desdeSIPS && value ? '#F1F8E9' : 'white'),
+          color: disabled ? COLOR_TEXT_LIGHT : COLOR_TEXT,
+          outline: 'none',
+          boxSizing: 'border-box'
+        }}
+      />
+      {unidad && <span style={{ fontSize: '13px', color: COLOR_TEXT_LIGHT, minWidth: '60px' }}>{unidad}</span>}
+    </div>
+  </div>
+));
+
+const FormSelect = React.memo(({ label, value, onChange, opciones = [], opcional = false, desdeSIPS = false }) => (
+  <div style={{ marginBottom: '16px' }}>
+    <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>
+      {label}
+      {opcional && <span style={{ color: COLOR_TEXT_LIGHT, fontWeight: '400', marginLeft: '6px' }}>(Opcional)</span>}
+      {desdeSIPS && value && <span style={{ marginLeft: '8px', fontSize: '10px', color: '#4CAF50', fontWeight: '400' }}>(SIPS)</span>}
+    </label>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        width: '100%',
+        padding: '10px 14px',
+        border: desdeSIPS && value ? '2px solid #4CAF50' : '1px solid #DEE2E6',
+        borderRadius: '8px',
+        fontSize: '14px',
+        backgroundColor: desdeSIPS && value ? '#F1F8E9' : 'white',
+        cursor: 'pointer',
+        boxSizing: 'border-box'
+      }}
+    >
+      <option value="">Seleccionar...</option>
+      {opciones.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
+    </select>
+  </div>
+));
+
+const FormToggle = React.memo(({ label, value, onChange }) => (
+  <div style={{ marginBottom: '16px' }}>
+    <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '8px' }}>
+      {label}
+    </label>
+    <div style={{ display: 'flex', gap: '12px' }}>
+      <button
+        type="button"
+        onClick={() => onChange('si')}
+        style={{
+          padding: '10px 24px',
+          border: value === 'si' ? `2px solid ${COLOR_CORP}` : '1px solid #DEE2E6',
+          borderRadius: '8px',
+          backgroundColor: value === 'si' ? '#FFF3E0' : 'white',
+          color: value === 'si' ? COLOR_CORP : COLOR_TEXT,
+          fontWeight: value === 'si' ? '600' : '400',
+          cursor: 'pointer',
+          transition: 'all 0.2s'
+        }}
+      >
+        Sí
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('no')}
+        style={{
+          padding: '10px 24px',
+          border: value === 'no' ? `2px solid ${COLOR_CORP}` : '1px solid #DEE2E6',
+          borderRadius: '8px',
+          backgroundColor: value === 'no' ? '#FFF3E0' : 'white',
+          color: value === 'no' ? COLOR_CORP : COLOR_TEXT,
+          fontWeight: value === 'no' ? '600' : '400',
+          cursor: 'pointer',
+          transition: 'all 0.2s'
+        }}
+      >
+        No
+      </button>
+    </div>
+  </div>
+));
+
+const SectionTitle = React.memo(({ children }) => (
+  <div style={{ display: 'flex', alignItems: 'center', marginTop: '28px', marginBottom: '18px' }}>
+    <span style={{ fontSize: '15px', fontWeight: '600', color: COLOR_CORP }}>{children}</span>
+    <div style={{ flex: 1, height: '2px', backgroundColor: COLOR_CORP_LIGHT, marginLeft: '15px' }} />
+  </div>
+));
+
+
 
 // ============================================
 // UTILIDADES PARA EXPORTACIÓN CSV/EXCEL
@@ -4047,35 +4161,18 @@ const Paso1Proyecto = ({ datos, onChange }) => {
     return limpiarDatosConsumo(datosConsumoTemp, erroresConsumo, opciones, resumenMesesConsumo);
   };
 
-  const InputField = ({ label, campo, tipo = 'text', placeholder, width = '100%', opcional = false, desdeSIPS = false }) => (
-    <div style={{ marginBottom: '16px' }} key={`input-${campo}`}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>
-        {label}
-        {opcional && <span style={{ color: COLOR_TEXT_LIGHT, fontWeight: '400' }}>(Opcional)</span>}
-      </label>
-      <input 
-        type={tipo} 
-        value={datos[campo] || ''} 
-        onChange={(e) => handleChange(campo, e.target.value)} 
-        placeholder={placeholder}
-        style={{ width, padding: '10px 14px', border: desdeSIPS && datos[campo] ? `2px solid #4CAF50` : '1px solid #DEE2E6', borderRadius: '8px', fontSize: '14px', backgroundColor: desdeSIPS && datos[campo] ? '#F1F8E9' : 'white', transition: 'all 0.2s', outline: 'none', boxSizing: 'border-box' }}
-      />
-    </div>
-  );
-
-  const SelectField = ({ label, campo, opciones, opcional = false }) => (
-    <div style={{ marginBottom: '16px' }}>
-      <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>
-        {label}
-        {opcional && <span style={{ color: COLOR_TEXT_LIGHT, fontWeight: '400', marginLeft: '6px' }}>(Opcional)</span>}
-      </label>
-      <select value={datos[campo] || ''} onChange={(e) => handleChange(campo, e.target.value)}
-        style={{ width: '100%', padding: '10px 14px', border: '1px solid #DEE2E6', borderRadius: '8px', fontSize: '14px', backgroundColor: 'white', cursor: 'pointer', boxSizing: 'border-box' }}>
-        <option value="">Seleccionar...</option>
-        {opciones.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
-      </select>
-    </div>
-  );
+  // IMPORTANTE: Estos son elementos JSX directos, NO componentes React
+  // Esto evita el bug de pérdida de foco al escribir
+  const inputStyle = (desdeSIPS, valor) => ({
+    width: '100%',
+    padding: '10px 14px',
+    border: desdeSIPS && valor ? '2px solid #4CAF50' : '1px solid #DEE2E6',
+    borderRadius: '8px',
+    fontSize: '14px',
+    backgroundColor: desdeSIPS && valor ? '#F1F8E9' : 'white',
+    outline: 'none',
+    boxSizing: 'border-box'
+  });
 
   const SectionTitle = ({ children }) => (
     <div style={{ display: 'flex', alignItems: 'center', marginTop: '28px', marginBottom: '18px' }}>
@@ -4364,51 +4461,117 @@ const Paso1Proyecto = ({ datos, onChange }) => {
 
       <SectionTitle>Identificación del Proyecto</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        <InputField label="ID de la Oferta" campo="id_oferta" placeholder="OFE_2024_001" />
-        <InputField label="Denominación de la Oferta" campo="denominacion_oferta" placeholder="Nombre descriptivo del proyecto" />
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>ID de la Oferta</label>
+          <input type="text" value={datos.id_oferta || ''} onChange={(e) => handleChange('id_oferta', e.target.value)} placeholder="OFE_2024_001" style={inputStyle(false, datos.id_oferta)} />
+        </div>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Denominación de la Oferta</label>
+          <input type="text" value={datos.denominacion_oferta || ''} onChange={(e) => handleChange('denominacion_oferta', e.target.value)} placeholder="Nombre descriptivo del proyecto" style={inputStyle(false, datos.denominacion_oferta)} />
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
-        <InputField label="Versión" campo="version" placeholder="1.0" />
-        <InputField label="Descripción de la Versión" campo="descripcion_version" placeholder="Versión inicial, revisión..." />
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Versión</label>
+          <input type="text" value={datos.version || ''} onChange={(e) => handleChange('version', e.target.value)} placeholder="1.0" style={inputStyle(false, datos.version)} />
+        </div>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Descripción de la Versión</label>
+          <input type="text" value={datos.descripcion_version || ''} onChange={(e) => handleChange('descripcion_version', e.target.value)} placeholder="Versión inicial, revisión..." style={inputStyle(false, datos.descripcion_version)} />
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        <InputField label="Fecha Solicitud Oferta" campo="fecha_solicitud" tipo="date" />
-        <InputField label="Fecha Inicio Oferta" campo="fecha_inicio" tipo="date" />
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Fecha Solicitud Oferta</label>
+          <input type="date" value={datos.fecha_solicitud || ''} onChange={(e) => handleChange('fecha_solicitud', e.target.value)} style={inputStyle(false, datos.fecha_solicitud)} />
+        </div>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Fecha Inicio Oferta</label>
+          <input type="date" value={datos.fecha_inicio || ''} onChange={(e) => handleChange('fecha_inicio', e.target.value)} style={inputStyle(false, datos.fecha_inicio)} />
+        </div>
       </div>
 
       <SectionTitle>Datos del Cliente</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-        <InputField label="Denominación del Cliente" campo="cliente_denominacion" placeholder="Nombre comercial o descriptivo del cliente" />
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Denominación del Cliente</label>
+          <input type="text" value={datos.cliente_denominacion || ''} onChange={(e) => handleChange('cliente_denominacion', e.target.value)} placeholder="Nombre comercial o descriptivo del cliente" style={inputStyle(false, datos.cliente_denominacion)} />
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-        <InputField label="Nombre / Razón Social" campo="cliente_nombre" placeholder="Empresa S.L." />
-        <InputField label="CIF / NIF" campo="cliente_cif" placeholder="B12345678" />
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Nombre / Razón Social</label>
+          <input type="text" value={datos.cliente_nombre || ''} onChange={(e) => handleChange('cliente_nombre', e.target.value)} placeholder="Empresa S.L." style={inputStyle(false, datos.cliente_nombre)} />
+        </div>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>CIF / NIF</label>
+          <input type="text" value={datos.cliente_cif || ''} onChange={(e) => handleChange('cliente_cif', e.target.value)} placeholder="B12345678" style={inputStyle(false, datos.cliente_cif)} />
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-        <InputField label="CNAE" campo="cnae" placeholder="4634" opcional desdeSIPS />
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>CNAE <span style={{ color: COLOR_TEXT_LIGHT, fontWeight: '400' }}>(Opcional)</span></label>
+          <input type="text" value={datos.cnae || ''} onChange={(e) => handleChange('cnae', e.target.value)} placeholder="4634" style={inputStyle(true, datos.cnae)} />
+        </div>
       </div>
 
       <SectionTitle>Ubicación del Proyecto</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-        <InputField label="Dirección" campo="ubicacion_direccion" placeholder="Calle, número, nave..." />
-        <InputField label="Código Postal" campo="ubicacion_cp" placeholder="41018" desdeSIPS />
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Dirección</label>
+          <input type="text" value={datos.ubicacion_direccion || ''} onChange={(e) => handleChange('ubicacion_direccion', e.target.value)} placeholder="Calle, número, nave..." style={inputStyle(false, datos.ubicacion_direccion)} />
+        </div>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Código Postal</label>
+          <input type="text" value={datos.ubicacion_cp || ''} onChange={(e) => handleChange('ubicacion_cp', e.target.value)} placeholder="41018" style={inputStyle(true, datos.ubicacion_cp)} />
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
-        <InputField label="Municipio" campo="ubicacion_municipio" placeholder="Sevilla" desdeSIPS />
-        <InputField label="Provincia" campo="ubicacion_provincia" placeholder="Sevilla" />
-        <SelectField label="Comunidad Autónoma" campo="ubicacion_comunidad" opciones={COMUNIDADES_AUTONOMAS.map(ca => ({ value: ca, label: ca }))} />
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Municipio</label>
+          <input type="text" value={datos.ubicacion_municipio || ''} onChange={(e) => handleChange('ubicacion_municipio', e.target.value)} placeholder="Sevilla" style={inputStyle(true, datos.ubicacion_municipio)} />
+        </div>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Provincia</label>
+          <input type="text" value={datos.ubicacion_provincia || ''} onChange={(e) => handleChange('ubicacion_provincia', e.target.value)} placeholder="Sevilla" style={inputStyle(false, datos.ubicacion_provincia)} />
+        </div>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Comunidad Autónoma</label>
+          <select value={datos.ubicacion_comunidad || ''} onChange={(e) => handleChange('ubicacion_comunidad', e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '1px solid #DEE2E6', borderRadius: '8px', fontSize: '14px', backgroundColor: 'white', cursor: 'pointer', boxSizing: 'border-box' }}>
+            <option value="">Seleccionar...</option>
+            {COMUNIDADES_AUTONOMAS.map(ca => <option key={ca} value={ca}>{ca}</option>)}
+          </select>
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        <InputField label="Latitud" campo="ubicacion_latitud" placeholder="37.3891°" />
-        <InputField label="Longitud" campo="ubicacion_longitud" placeholder="-5.9845°" />
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Latitud</label>
+          <input type="text" value={datos.ubicacion_latitud || ''} onChange={(e) => handleChange('ubicacion_latitud', e.target.value)} placeholder="37.3891°" style={inputStyle(false, datos.ubicacion_latitud)} />
+        </div>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Longitud</label>
+          <input type="text" value={datos.ubicacion_longitud || ''} onChange={(e) => handleChange('ubicacion_longitud', e.target.value)} placeholder="-5.9845°" style={inputStyle(false, datos.ubicacion_longitud)} />
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
-        <InputField label="Coordenada X" campo="coordenada_x" placeholder="234567.89" />
-        <InputField label="Coordenada Y" campo="coordenada_y" placeholder="4123456.78" />
-        <InputField label="Huso" campo="huso" placeholder="30" />
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Coordenada X</label>
+          <input type="text" value={datos.coordenada_x || ''} onChange={(e) => handleChange('coordenada_x', e.target.value)} placeholder="234567.89" style={inputStyle(false, datos.coordenada_x)} />
+        </div>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Coordenada Y</label>
+          <input type="text" value={datos.coordenada_y || ''} onChange={(e) => handleChange('coordenada_y', e.target.value)} placeholder="4123456.78" style={inputStyle(false, datos.coordenada_y)} />
+        </div>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Huso</label>
+          <input type="text" value={datos.huso || ''} onChange={(e) => handleChange('huso', e.target.value)} placeholder="30" style={inputStyle(false, datos.huso)} />
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-        <InputField label="Referencia Catastral" campo="referencia_catastral" placeholder="1234567AB1234C0001XX" opcional />
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '500', color: COLOR_TEXT, marginBottom: '6px' }}>Referencia Catastral <span style={{ color: COLOR_TEXT_LIGHT, fontWeight: '400' }}>(Opcional)</span></label>
+          <input type="text" value={datos.referencia_catastral || ''} onChange={(e) => handleChange('referencia_catastral', e.target.value)} placeholder="1234567AB1234C0001XX" style={inputStyle(false, datos.referencia_catastral)} />
+        </div>
       </div>
 
       {/* Modal del Validador de Consumos */}
@@ -7685,8 +7848,12 @@ export default function YlioApp() {
   
   // Estado de oportunidades guardadas
   const [oportunidadesGuardadas, setOportunidadesGuardadas] = useState([]);
+  
+  // Estado para mostrar notificación de autoguardado
 
-  // Estado de datos de la oportunidad
+  
+
+  // Estado de datos de la oportunidad (inicializar desde localStorage si existe)
   const [datosOportunidad, setDatosOportunidad] = useState({
     // Archivos
     archivo_sips: '',
@@ -7884,6 +8051,12 @@ export default function YlioApp() {
   });
   
   const [errores, setErrores] = useState({});
+
+  
+
+  
+
+  
 
   // Generar nuevo ID de oferta
   const generarNuevoId = () => {
@@ -8198,6 +8371,7 @@ export default function YlioApp() {
                 📋 {datosOportunidad.id_oferta}
               </span>
             )}
+            
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 
