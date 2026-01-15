@@ -7683,34 +7683,9 @@ export default function YlioApp() {
   
   // Estado de oportunidades guardadas
   const [oportunidadesGuardadas, setOportunidadesGuardadas] = useState([]);
-  
-  // Estado para mostrar notificación de autoguardado
-  const [mostrarAutoguardado, setMostrarAutoguardado] = useState(false);
-  const [ultimoGuardado, setUltimoGuardado] = useState(null);
 
-  // Función para cargar datos guardados de localStorage
-  const cargarDatosGuardados = () => {
-    try {
-      const datosGuardados = localStorage.getItem('ylio_datos_oportunidad');
-      const pasoGuardado = localStorage.getItem('ylio_paso_actual');
-      const pantallaGuardada = localStorage.getItem('ylio_pantalla');
-      
-      if (datosGuardados) {
-        return {
-          datos: JSON.parse(datosGuardados),
-          paso: pasoGuardado ? parseInt(pasoGuardado) : 1,
-          pantalla: pantallaGuardada || 'inicio'
-        };
-      }
-    } catch (e) {
-      console.error('Error cargando datos guardados:', e);
-    }
-    return null;
-  };
-
-  // Estado de datos de la oportunidad (inicializar desde localStorage si existe)
-  const datosIniciales = cargarDatosGuardados();
-  const [datosOportunidad, setDatosOportunidad] = useState(datosIniciales?.datos || {
+  // Estado de datos de la oportunidad
+  const [datosOportunidad, setDatosOportunidad] = useState({
     // Archivos
     archivo_sips: '',
     archivo_consumo: '',
@@ -7907,48 +7882,6 @@ export default function YlioApp() {
   });
   
   const [errores, setErrores] = useState({});
-
-  // Efecto para restaurar paso y pantalla al cargar
-  React.useEffect(() => {
-    if (datosIniciales) {
-      setPasoActual(datosIniciales.paso);
-      setPantalla(datosIniciales.pantalla);
-    }
-  }, []);
-
-  // Efecto para autoguardar cuando cambian los datos
-  React.useEffect(() => {
-    // No guardar si estamos en la pantalla de inicio sin datos
-    if (pantalla === 'inicio' && !datosOportunidad.id_oferta) return;
-    
-    const timeoutId = setTimeout(() => {
-      try {
-        localStorage.setItem('ylio_datos_oportunidad', JSON.stringify(datosOportunidad));
-        localStorage.setItem('ylio_paso_actual', pasoActual.toString());
-        localStorage.setItem('ylio_pantalla', pantalla);
-        
-        // Mostrar notificación de autoguardado
-        setUltimoGuardado(new Date());
-        setMostrarAutoguardado(true);
-        
-        // Ocultar la notificación después de 2 segundos
-        setTimeout(() => setMostrarAutoguardado(false), 2000);
-        
-        console.log('Autoguardado:', new Date().toLocaleTimeString());
-      } catch (e) {
-        console.error('Error en autoguardado:', e);
-      }
-    }, 500); // Debounce de 500ms para no guardar en cada tecla
-    
-    return () => clearTimeout(timeoutId);
-  }, [datosOportunidad, pasoActual, pantalla]);
-
-  // Función para limpiar datos guardados
-  const limpiarDatosGuardados = () => {
-    localStorage.removeItem('ylio_datos_oportunidad');
-    localStorage.removeItem('ylio_paso_actual');
-    localStorage.removeItem('ylio_pantalla');
-  };
 
   // Generar nuevo ID de oferta
   const generarNuevoId = () => {
@@ -8263,30 +8196,6 @@ export default function YlioApp() {
                 📋 {datosOportunidad.id_oferta}
               </span>
             )}
-            {/* Indicador de sesión guardada */}
-            {pantalla === 'inicio' && datosIniciales && datosIniciales.datos?.id_oferta && (
-              <button
-                onClick={() => {
-                  setPantalla(datosIniciales.pantalla || 'oportunidad');
-                  setPasoActual(datosIniciales.paso || 1);
-                }}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#FFF3E0',
-                  border: `1px solid ${COLOR_CORP}`,
-                  borderRadius: '6px',
-                  color: COLOR_CORP,
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                🔄 Recuperar sesión ({datosIniciales.datos.id_oferta})
-              </button>
-            )}
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -8306,33 +8215,6 @@ export default function YlioApp() {
             </div>
           </div>
         </div>
-        
-        {/* ========== NOTIFICACIÓN DE AUTOGUARDADO ========== */}
-        {mostrarAutoguardado && (
-          <div style={{
-            position: 'fixed',
-            bottom: '20px',
-            right: '20px',
-            backgroundColor: '#E8F5E9',
-            border: '1px solid #4CAF50',
-            borderRadius: '8px',
-            padding: '12px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            zIndex: 9999,
-            animation: 'fadeIn 0.3s ease-out'
-          }}>
-            <span style={{ fontSize: '18px' }}>💾</span>
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: '#2E7D32' }}>Autoguardado</div>
-              <div style={{ fontSize: '11px', color: '#558B2F' }}>
-                {ultimoGuardado ? ultimoGuardado.toLocaleTimeString() : ''}
-              </div>
-            </div>
-          </div>
-        )}
         
         {/* ========== CONTENIDO ========== */}
         {pantalla === 'inicio' ? (
